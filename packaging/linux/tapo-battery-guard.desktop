@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Tapo Battery Guard
+Comment=Enciende o apaga un enchufe Tapo según la batería del portátil
+Exec=TapoBatteryGuard
+Icon=tapo-battery-guard
+Terminal=false
+Categories=Utility;
+StartupNotify=true

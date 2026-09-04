@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        run: python -m pip install -U pip && python -m pip install -e ".[pack]"
+      - name: Instalar Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Crear instalador
+        run: python packaging/build.py --installer
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/TapoBatteryGuard-*-Setup.exe
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Dependencias del sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk libfuse2 gir1.2-ayatanaappindicator3-0.1
+      - name: Instalar dependencias
+        run: python -m pip install -U pip && python -m pip install -e ".[pack]"
+      - name: Crear AppImage
+        run: python packaging/build.py --appimage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: dist/*.AppImage
