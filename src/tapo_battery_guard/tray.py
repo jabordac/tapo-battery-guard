@@ -15,9 +15,11 @@ if TYPE_CHECKING:
 
 def _enable_system_gi() -> None:
     """Permite usar PyGObject del sistema desde un venv aislado (Linux)."""
+    major, minor = sys.version_info.major, sys.version_info.minor
     extras = (
         "/usr/lib/python3/dist-packages",
-        f"/usr/lib/python{sys.version_info.major}.{sys.version_info.minor}/dist-packages",
+        f"/usr/lib/python{major}.{minor}/dist-packages",
+        f"/usr/lib/python{major}.{minor}/site-packages",
     )
     for extra in extras:
         path = Path(extra)

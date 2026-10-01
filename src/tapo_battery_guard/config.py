@@ -16,6 +16,7 @@ KEYRING_SERVICE = "tapo-battery-guard"
 @dataclass
 class AppConfig:
     host: str = ""
+    child: str = ""
     username: str = ""
     min_percent: int = 20
     max_percent: int = 80
@@ -28,7 +29,7 @@ class AppConfig:
         if not self.host.strip():
             return "Indica la IP o el nombre del enchufe."
         if not self.username.strip():
-            return "Indica el correo de la cuenta Tapo."
+            return "Indica el correo de la cuenta TP-Link (Tapo o Kasa)."
         if not 0 <= self.min_percent <= 100:
             return "El mínimo debe estar entre 0 y 100."
         if not 0 <= self.max_percent <= 100:
@@ -60,6 +61,7 @@ def load_config() -> AppConfig:
     defaults = AppConfig()
     return AppConfig(
         host=str(data.get("host", defaults.host)),
+        child=str(data.get("child", defaults.child)),
         username=str(data.get("username", defaults.username)),
         min_percent=int(data.get("min_percent", defaults.min_percent)),
         max_percent=int(data.get("max_percent", defaults.max_percent)),

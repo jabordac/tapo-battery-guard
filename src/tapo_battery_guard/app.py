@@ -26,8 +26,8 @@ class BatteryGuardApp(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Tapo Battery Guard")
-        self.geometry("520x640")
-        self.minsize(480, 600)
+        self.geometry("520x700")
+        self.minsize(480, 640)
 
         self.config_data = load_config()
         self.client = TapoClient()
@@ -39,6 +39,7 @@ class BatteryGuardApp(ctk.CTk):
         self._busy = False
         self._quitting = False
         self._tray_hint_shown = False
+        self._updating_child_combo = False
         self._plug_on: bool | None = None
         self.tray = SystemTray(
             on_show=lambda: self.after(0, self._show_window),
@@ -75,7 +76,7 @@ class BatteryGuardApp(ctk.CTk):
         ).grid(row=0, column=0, sticky="w")
         ctk.CTkLabel(
             header,
-            text="Enciende o apaga el enchufe según el % real de la batería.",
+            text="Enciende o apaga el enchufe o una toma de la regleta según el % de batería.",
             font=ctk.CTkFont(size=13),
             text_color=("gray30", "gray70"),
         ).grid(row=1, column=0, sticky="w", pady=(2, 0))
@@ -107,6 +108,7 @@ class BatteryGuardApp(ctk.CTk):
         self.min_var = ctk.StringVar(value=str(self.config_data.min_percent))
         self.max_var = ctk.StringVar(value=str(self.config_data.max_percent))
         self.host_var = ctk.StringVar(value=self.config_data.host)
+        self.child_var = ctk.StringVar(value="")
         self.user_var = ctk.StringVar(value=self.config_data.username)
         self.password_var = ctk.StringVar(value=load_password(self.config_data.username))
         self.auto_var = ctk.BooleanVar(value=self.config_data.auto_connect)
@@ -115,12 +117,13 @@ class BatteryGuardApp(ctk.CTk):
 
         self._labeled_entry(form, "Mínimo (%)", self.min_var, 0, 0)
         self._labeled_entry(form, "Máximo (%)", self.max_var, 0, 1)
-        self._labeled_entry(form, "IP o host del enchufe", self.host_var, 1, 0, span=2)
-        self._labeled_entry(form, "Correo Tapo", self.user_var, 2, 0, span=2)
-        self._labeled_entry(form, "Contraseña Tapo", self.password_var, 3, 0, span=2, secret=True)
+        self._labeled_entry(form, "IP o host del enchufe / regleta", self.host_var, 1, 0, span=2)
+        self._child_combo(form, 2)
+        self._labeled_entry(form, "Correo TP-Link (Tapo o Kasa)", self.user_var, 3, 0, span=2)
+        self._labeled_entry(form, "Contraseña TP-Link", self.password_var, 4, 0, span=2, secret=True)
 
         flags = ctk.CTkFrame(form, fg_color="transparent")
-        flags.grid(row=4, column=0, columnspan=2, sticky="ew", padx=12, pady=(8, 4))
+        flags.grid(row=5, column=0, columnspan=2, sticky="ew", padx=12, pady=(8, 4))
         ctk.CTkCheckBox(
             flags,
             text="Automatización activa",
@@ -146,7 +149,7 @@ class BatteryGuardApp(ctk.CTk):
         ).pack(side="left")
 
         buttons = ctk.CTkFrame(form, fg_color="transparent")
-        buttons.grid(row=5, column=0, columnspan=2, sticky="ew", padx=12, pady=(8, 16))
+        buttons.grid(row=6, column=0, columnspan=2, sticky="ew", padx=12, pady=(8, 16))
         for i in range(4):
             buttons.grid_columnconfigure(i, weight=1)
 
@@ -162,7 +165,7 @@ class BatteryGuardApp(ctk.CTk):
         self.status_box = ctk.CTkTextbox(self, height=90)
         self.status_box.grid(row=3, column=0, sticky="ew", padx=20, pady=(4, 18))
         self.status_box.configure(state="disabled")
-        self._set_status("Listo. Guarda los datos del enchufe y pulsa Conectar.")
+        self._set_status("Listo. Guarda la IP y, si es una regleta, elige el conector del cargador.")
 
     def _start_tray(self) -> None:
         if self.tray.start():
@@ -194,6 +197,78 @@ class BatteryGuardApp(ctk.CTk):
         entry = ctk.CTkEntry(box, textvariable=variable, show="•" if secret else "")
         entry.grid(row=1, column=0, sticky="ew", pady=(4, 0))
 
+    def _child_combo(self, parent: ctk.CTkFrame, row: int) -> None:
+        box = ctk.CTkFrame(parent, fg_color="transparent")
+        box.grid(row=row, column=0, columnspan=2, sticky="ew", padx=12, pady=8)
+        box.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(box, text="Conector (regleta HS300: una IP, varias tomas)").grid(
+            row=0, column=0, sticky="w"
+        )
+        self.child_combo = ctk.CTkComboBox(
+            box,
+            variable=self.child_var,
+            values=["(enchufe único o elígelo al conectar)"],
+            command=self._on_child_chosen,
+        )
+        self.child_combo.grid(row=1, column=0, sticky="ew", pady=(4, 0))
+        if self.config_data.child.strip():
+            spec = self.config_data.child.strip()
+            self.child_combo.configure(values=[spec])
+            self.child_var.set(spec)
+
+    def _child_spec(self) -> str:
+        raw = (self.child_var.get() or "").strip()
+        if not raw or raw.startswith("("):
+            return ""
+        return raw.split("·", 1)[0].strip()
+
+    def _set_child_choices(self, labels: list[str], selected: str = "") -> None:
+        if not labels:
+            labels = ["(enchufe único o elígelo al conectar)"]
+            selected = labels[0]
+        self._updating_child_combo = True
+        try:
+            self.child_combo.configure(values=labels)
+            if selected and selected in labels:
+                self.child_var.set(selected)
+            elif selected:
+                match = next(
+                    (
+                        label
+                        for label in labels
+                        if label.startswith(f"{selected} ·") or label == selected
+                    ),
+                    "",
+                )
+                self.child_var.set(match or labels[0])
+            else:
+                self.child_var.set(labels[0])
+        finally:
+            self._updating_child_combo = False
+
+    def _on_child_chosen(self, _value: str | None = None) -> None:
+        if self._updating_child_combo:
+            return
+        spec = self._child_spec()
+        self.config_data.child = spec
+        if not spec or not self.client.parent_connected:
+            return
+        try:
+            self.client.select_child(spec)
+        except Exception as exc:
+            self._set_status(str(exc))
+            return
+        if self.client.connected:
+            self._run_async(
+                self._after_child_selected(),
+                f"Usando el conector {spec}...",
+            )
+
+    async def _after_child_selected(self) -> None:
+        plug_on = await self.client.is_on()
+        self._ui(lambda: self._on_connected(plug_on))
+        self._start_polling()
+
     def _apply_theme(self) -> None:
         ctk.set_appearance_mode("dark" if self.theme_var.get() else "light")
 
@@ -220,6 +295,7 @@ class BatteryGuardApp(ctk.CTk):
 
         config = AppConfig(
             host=self.host_var.get().strip(),
+            child=self._child_spec(),
             username=self.user_var.get().strip(),
             min_percent=min_percent,
             max_percent=max_percent,
@@ -251,17 +327,41 @@ class BatteryGuardApp(ctk.CTk):
         if config is None:
             return
         password = self.password_var.get()
-        if not password:
-            self._set_status("Indica la contraseña de la cuenta Tapo.")
-            return
         self.config_data = config
-        self._run_async(self._connect_async(config, password), "Conectando con el enchufe Tapo...")
+        self._run_async(self._connect_async(config, password), "Conectando con el dispositivo TP-Link...")
 
     async def _connect_async(self, config: AppConfig, password: str) -> None:
-        await self.client.connect(config.host, config.username, password)
+        await self.client.connect(config.host, config.username, password, config.child)
+        self._ui(self._refresh_outlet_choices)
+        if not self.client.connected:
+            self._ui(self._on_strip_needs_child)
+            return
         plug_on = await self.client.is_on()
         self._ui(lambda: self._on_connected(plug_on))
         self._start_polling()
+
+    def _refresh_outlet_choices(self) -> None:
+        choices = self.client.list_children()
+        if not choices:
+            self._set_child_choices(["(enchufe único)"], "(enchufe único)")
+            return
+        labels = [choice.label for choice in choices]
+        selected = self.client.child or self.config_data.child or self._child_spec()
+        self._set_child_choices(labels, selected)
+
+    def _on_strip_needs_child(self) -> None:
+        self.connect_btn.configure(state="normal")
+        self.toggle_btn.configure(state="disabled")
+        self.link_label.configure(text="Regleta conectada")
+        self.model_label.configure(text=self.client.model or "HS300")
+        self.alias_label.configure(text=self.config_data.host)
+        self._set_plug_state(None)
+        choices = self.client.list_children()
+        listing = ", ".join(choice.label for choice in choices)
+        self._set_status(
+            "La HS300 (y otras regletas Kasa) tiene una sola IP y varias tomas. "
+            f"Elige el conector del cargador: {listing}."
+        )
 
     def _set_plug_state(self, plug_on: bool | None) -> None:
         self._plug_on = plug_on
@@ -273,10 +373,13 @@ class BatteryGuardApp(ctk.CTk):
     def _on_connected(self, plug_on: bool) -> None:
         self.connect_btn.configure(state="disabled")
         self.toggle_btn.configure(state="normal")
-        self.link_label.configure(text="Tapo conectado")
+        self.link_label.configure(text="Conectado")
         self._set_plug_state(plug_on)
-        self.model_label.configure(text=self.client.model or "Tapo")
-        self.alias_label.configure(text=self.client.alias or self.config_data.host)
+        self.model_label.configure(text=self.client.model or "TP-Link")
+        alias = self.client.alias or self.config_data.host
+        if self.client.child:
+            alias = f"{alias} · toma {self.client.child}"
+        self.alias_label.configure(text=alias)
         self._set_status("Conectado. La automatización usará el porcentaje de batería del portátil.")
 
     def _toggle(self) -> None:
@@ -290,21 +393,31 @@ class BatteryGuardApp(ctk.CTk):
     def _discover(self) -> None:
         username = self.user_var.get().strip()
         password = self.password_var.get()
-        if not username or not password:
-            self._set_status("Para descubrir enchufes hacen falta el correo y la contraseña Tapo.")
-            return
-        self._run_async(self._discover_async(username, password), "Buscando enchufes Tapo en la red local...")
+        self._run_async(self._discover_async(username, password), "Buscando enchufes y regletas en la red local...")
 
     async def _discover_async(self, username: str, password: str) -> None:
         plugs = await discover_plugs(username, password)
         if not plugs:
-            self._ui(lambda: self._set_status("No se encontró ningún enchufe Tapo en la red."))
+            self._ui(lambda: self._set_status("No se encontró ningún enchufe ni regleta en la red."))
             return
 
         first = plugs[0]
         self._ui(lambda: self.host_var.set(first.host))
-        listing = ", ".join(f"{item.alias} ({item.model} · {item.host})" for item in plugs)
-        self._ui(lambda: self._set_status(f"Encontrados: {listing}. Se rellenó el primero en el campo IP."))
+        strip_children = [item for item in plugs if item.host == first.host and item.child]
+        if strip_children:
+            labels = [f"{item.child} · {item.alias}" for item in strip_children]
+            selected = next(
+                (f"{item.child} · {item.alias}" for item in strip_children if item.child == self.config_data.child),
+                labels[0],
+            )
+            self._ui(lambda: self._set_child_choices(labels, selected))
+        listing = ", ".join(
+            f"{item.alias} ({item.model} · {item.host}"
+            + (f" · toma {item.child}" if item.child else "")
+            + ")"
+            for item in plugs
+        )
+        self._ui(lambda: self._set_status(f"Encontrados: {listing}. Se rellenó el primero en IP / conector."))
 
     def _start_polling(self) -> None:
         if self._poll_task is not None and not self._poll_task.done():

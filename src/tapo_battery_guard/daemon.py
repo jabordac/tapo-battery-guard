@@ -36,8 +36,16 @@ async def run_daemon() -> None:
             signal.signal(sig, lambda *_args: stop.set())
 
     log.info("Conectando con %s", config.host)
-    await client.connect(config.host, config.username, password)
-    log.info("Conectado a %s (%s)", client.alias or config.host, client.model or "Tapo")
+    await client.connect(config.host, config.username, password, config.child)
+    if config.child:
+        log.info(
+            "Conectado a %s (%s), conector %s",
+            client.alias or config.host,
+            client.model or "TP-Link",
+            config.child,
+        )
+    else:
+        log.info("Conectado a %s (%s)", client.alias or config.host, client.model or "TP-Link")
 
     while not stop.is_set():
         try:
@@ -46,7 +54,7 @@ async def run_daemon() -> None:
         except Exception as exc:
             log.warning("Error de control: %s. Reintentando conexión.", exc)
             try:
-                await client.connect(config.host, config.username, password)
+                await client.connect(config.host, config.username, password, config.child)
             except Exception as reconnect_error:
                 log.warning("No se pudo reconectar: %s", reconnect_error)
         try:

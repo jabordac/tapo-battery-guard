@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tapo-battery-guard"
-version = "0.2.0"
+version = "0.3.0"
 description = "Controla un enchufe Tapo según el porcentaje de batería del portátil en Windows y Linux"
 readme = "README.md"
 requires-python = ">=3.11"

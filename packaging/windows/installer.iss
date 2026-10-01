@@ -1,6 +1,6 @@
 #define MyAppName "Tapo Battery Guard"
 #ifndef AppVersion
-#define AppVersion "0.2.0"
+#define AppVersion "0.3.0"
 #endif
 #define MyAppPublisher "Tapo Battery Guard"
 #define MyAppExeName "TapoBatteryGuard.exe"

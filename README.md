@@ -1,10 +1,10 @@
 # Tapo Battery Guard
 
-Aplicación de escritorio para **Windows y Linux** que enciende o apaga un enchufe Tapo según el **porcentaje real de batería** del portátil.
+Aplicación de escritorio para **Windows y Linux** que enciende o apaga un enchufe Tapo o **una toma de una regleta Kasa** según el **porcentaje real de batería** del portátil.
 
 Está inspirada en [Tapo100Automation_Laptop](https://github.com/deadlykam/Tapo100Automation_Laptop), pero usa `python-kasa` (protocolo KLAP actual) y no `PyP100`.
 
-Sirve con el **P110M**, el **P125M** y otros enchufes Tapo de la misma red.
+Sirve con el **P110M**, el **P125M**, la **HS300** y otros enchufes Tapo/Kasa de la misma red.
 
 ## Cómo funciona
 
@@ -18,8 +18,8 @@ Esto no lee el Charge Guard del enchufe: el portátil decide con su propia bater
 
 - Python 3.11 o posterior
 - Portátil con batería
-- Enchufe Tapo en la misma red Wi‑Fi 2.4 GHz
-- Cuenta Tapo (el mismo correo y contraseña de la app)
+- Enchufe Tapo o regleta Kasa en la misma red Wi‑Fi 2.4 GHz
+- Cuenta TP-Link (el mismo correo y contraseña de la app Tapo o Kasa)
 
 En Linux, Tkinter:
 
@@ -50,10 +50,11 @@ o:
 python -m tapo_battery_guard
 ```
 
-1. Correo y contraseña de Tapo.
+1. Correo y contraseña de TP-Link (Tapo o Kasa).
 2. IP del enchufe, o pulsa **Descubrir**.
-3. Umbrales mínimo y máximo.
-4. **Guardar** y **Conectar**.
+3. Si es una **HS300** (u otra regleta), elige el **conector** del cargador. Toda la regleta comparte una IP; cada toma se controla aparte.
+4. Umbrales mínimo y máximo.
+5. **Guardar** y **Conectar**.
 
 La contraseña se guarda en el llavero del sistema (Credential Manager en Windows, Secret Service/KWallet en Linux), no en el archivo de configuración.
 
@@ -97,13 +98,14 @@ python packaging/build.py --installer  # Windows: dist/*-Setup.exe (requiere Inn
 
 En Windows, Inno Setup 6: https://jrsoftware.org/isinfo.php
 
-En GitHub, el flujo `Release` genera ambos al publicar una etiqueta `v0.2.0` o al lanzarlo a mano.
+En GitHub, el flujo `Release` genera ambos al publicar una etiqueta `v0.3.0` o al lanzarlo a mano.
 
 ## Notas
 
 - Si el portátil se suspende o se apaga, este programa deja de controlar el enchufe. En un P110M puedes dejar Charge Guard como respaldo.
 - La IP puede cambiar con el DHCP. Usa **Descubrir** o reserva la IP en el router.
-- En la app Tapo, el dispositivo debe estar emparejado con tu cuenta.
+- En la app Tapo o Kasa, el dispositivo debe estar emparejado con tu cuenta.
+- En una HS300, los USB no se encienden o apagan por separado: solo las 6 tomas de corriente.
 
 ## Licencia
 
